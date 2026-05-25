@@ -18,7 +18,6 @@ import { useColors } from "@/hooks/useColors";
 // Each meditation draws from a pool of tracks. Add more files as needed.
 const AUDIO_POOLS = {
   sleep: [
-    require("@/assets/audio/Sleep 1.mp3"),
     require("@/assets/audio/Sleep 2.mp3"),
   ],
   energy: [
@@ -185,6 +184,12 @@ export default function MindfulnessScreen() {
   const historyRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
+    Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: true,
+    }).catch(() => {});
+
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       isRunning.current = false;
