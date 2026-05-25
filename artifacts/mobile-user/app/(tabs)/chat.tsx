@@ -69,7 +69,7 @@ export default function ChatScreen() {
 
       try {
         const history = [...messages, userMsg]
-          .filter((m) => m.id !== "welcome" || m.role !== "assistant")
+          .filter((m) => !(m.id === "welcome" && m.role === "assistant"))
           .map((m) => ({ role: m.role, content: m.content }));
 
         const res = await fetch(
@@ -85,17 +85,25 @@ export default function ChatScreen() {
         );
 
         const data = await res.json();
+        console.log("Chat API response:", JSON.stringify(data));
+
+        if (!res.ok) {
+          throw new Error(data.error ?? "API error");
+        }
+
         const assistantMsg: Message = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
           content:
             data.message?.content ??
+            data.choices?.[0]?.message?.content ??
             "I'm here with you. Could you tell me more?",
           timestamp: new Date(),
         };
 
         setMessages((prev) => [...prev, assistantMsg]);
-      } catch {
+      } catch (err) {
+        console.error("Chat error:", err);
         setMessages((prev) => [
           ...prev,
           {

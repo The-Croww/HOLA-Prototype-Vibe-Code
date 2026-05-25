@@ -34,6 +34,13 @@ let _tokenRef: string | null = null;
 
 setAuthTokenGetter(() => _tokenRef);
 
+async function clearStorage() {
+  await Promise.all([
+    AsyncStorage.removeItem(TOKEN_KEY),
+    AsyncStorage.removeItem(USER_KEY),
+  ]);
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<StoredUser | null>(null);
@@ -46,7 +53,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(TOKEN_KEY),
           AsyncStorage.getItem(USER_KEY),
         ]);
-        if (storedToken && storedUser) {
+
+        if (!storedToken || !storedUser) {
+          return;
+        }
+
+        // Validate token is still accepted by the server.
+        // The in-memory store resets on server restart, so previously registered
+        // users will be gone. A 401 or 404 means we must clear the stale session.
+        try {
+          const baseUrl = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+          const res = await fetch(`${baseUrl}/api/v1/users/me`, {
+            headers: { Authorization: `Bearer ${storedToken}` },
+          });
+
+          if (res.status === 401 || res.status === 404) {
+            await clearStorage();
+            return;
+          }
+
+          // Token is valid — hydrate auth state
+          _tokenRef = storedToken;
+          setToken(storedToken);
+          setUser(JSON.parse(storedUser) as StoredUser);
+        } catch {
+          // Network error on startup — keep the session optimistically so the
+          // app can still render; requests will fail individually if needed.
           _tokenRef = storedToken;
           setToken(storedToken);
           setUser(JSON.parse(storedUser) as StoredUser);
@@ -69,10 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     _tokenRef = null;
-    await Promise.all([
-      AsyncStorage.removeItem(TOKEN_KEY),
-      AsyncStorage.removeItem(USER_KEY),
-    ]);
+    await clearStorage();
     setToken(null);
     setUser(null);
   }, []);
