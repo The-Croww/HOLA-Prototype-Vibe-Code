@@ -5,7 +5,9 @@
  * HOLA! Life Buddy API
  * OpenAPI spec version: 0.1.0
  */
+import type { MoodEntry } from './moodEntry';
 
-export interface HealthStatus {
-  status: string;
+export interface MoodEntriesResponse {
+  entries: MoodEntry[];
+  total: number;
 }

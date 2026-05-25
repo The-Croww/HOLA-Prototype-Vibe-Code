@@ -1,0 +1,26 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "crQm5S6SNqO0eHJeN7oac"
+uri = "file://artifacts/mobile-user/assets/images/icon.png"
+type = "image"
+title = "hola app icon"
+
+[[generated]]
+id = "TDssPYxYEwLwr-w-7xG6C"
+uri = "file://artifacts/mobile-user/assets/images/onboarding1.png"
+type = "image"
+title = "onboarding wellness illustration"
+
+[[generated]]
+id = "3R344rpJ4Kw1Ro1J0ogFs"
+uri = "file://artifacts/mobile-user/assets/images/onboarding2.png"
+type = "image"
+title = "onboarding mood illustration"
+
+[[generated]]
+id = "O2C5jbVTjpD49Ly5eJXXq"
+uri = "file://artifacts/mobile-user/assets/images/onboarding3.png"
+type = "image"
+title = "onboarding chat illustration"
