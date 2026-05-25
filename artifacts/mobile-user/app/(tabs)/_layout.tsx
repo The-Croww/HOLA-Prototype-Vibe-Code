@@ -19,12 +19,23 @@ function NativeTabLayout() {
         <Icon sf={{ default: "face.smiling", selected: "face.smiling.fill" }} />
         <Label>Mood</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="chat">
+        <Icon
+          sf={{
+            default: "bubble.left.and.bubble.right",
+            selected: "bubble.left.and.bubble.right.fill",
+          }}
+        />
+        <Label>Buddy</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="mindfulness">
         <Icon sf={{ default: "wind", selected: "wind" }} />
         <Label>Mindfulness</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
-        <Icon sf={{ default: "person.circle", selected: "person.circle.fill" }} />
+        <Icon
+          sf={{ default: "person.circle", selected: "person.circle.fill" }}
+        />
         <Label>Profile</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
@@ -94,6 +105,22 @@ function ClassicTabLayout() {
               <SymbolView name="face.smiling" tintColor={color} size={24} />
             ) : (
               <Feather name="activity" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: "Buddy",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView
+                name="bubble.left.and.bubble.right"
+                tintColor={color}
+                size={24}
+              />
+            ) : (
+              <Feather name="message-circle" size={22} color={color} />
             ),
         }}
       />
