@@ -73,7 +73,7 @@ export default function ChatScreen() {
           .map((m) => ({ role: m.role, content: m.content }));
 
         const res = await fetch(
-          `${process.env.EXPO_PUBLIC_API_URL ?? ""}/api/v1/chat`,
+          `https://${process.env.EXPO_PUBLIC_DOMAIN}/api/v1/chat`,
           {
             method: "POST",
             headers: {
