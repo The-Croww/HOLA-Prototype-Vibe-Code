@@ -175,6 +175,7 @@ export default function MindfulnessScreen() {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
   const [playbackPosition, setPlaybackPosition] = useState(0);
   const [playbackDuration, setPlaybackDuration] = useState(0);
   const [currentTrackName, setCurrentTrackName] = useState("");
@@ -184,11 +185,13 @@ export default function MindfulnessScreen() {
   const historyRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
-    Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
-      shouldDuckAndroid: true,
-    }).catch(() => {});
+    if (Platform.OS !== "web") {
+      Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      }).catch(() => {});
+    }
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -277,8 +280,9 @@ export default function MindfulnessScreen() {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
-      console.error("Error loading audio:", error);
       setIsLoading(false);
+      setAudioError("Couldn't play audio on this device. Try another track.");
+      setTimeout(() => setAudioError(null), 3000);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
@@ -836,6 +840,13 @@ export default function MindfulnessScreen() {
               Tap any session to play a random track. Each time you tap, a
               different song plays.
             </Text>
+            {audioError && (
+              <View style={{ backgroundColor: "#FF6B6B22", borderRadius: 8, padding: 10 }}>
+                <Text style={{ color: "#FF6B6B", fontSize: 13, fontFamily: "Inter_500Medium" }}>
+                  {audioError}
+                </Text>
+              </View>
+            )}
             <View style={styles.meditationGrid}>
               {MEDITATIONS.map((med) => (
                 <TouchableOpacity
