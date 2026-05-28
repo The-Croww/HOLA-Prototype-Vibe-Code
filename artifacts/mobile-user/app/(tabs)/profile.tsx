@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,9 +12,26 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColorScheme } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
-import { useGetMe } from "@workspace/api-client-react";
+import { useGetMe, useGetMoodEntries } from "@workspace/api-client-react";
+
+const JOURNAL_STORAGE_KEY = "@hola_journal_entries";
+
+function calcStreak(entries: { createdAt: string }[]): number {
+  if (entries.length === 0) return 0;
+  const days = new Set(entries.map((e) => new Date(e.createdAt).toDateString()));
+  let streak = 0;
+  const today = new Date();
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    if (days.has(d.toDateString())) streak++;
+    else break;
+  }
+  return streak;
+}
 
 export default function ProfileScreen() {
   const colors = useColors();
@@ -27,8 +44,21 @@ export default function ProfileScreen() {
 
   const [shareData, setShareData] = useState(true);
   const [notifications, setNotifications] = useState(true);
+  const [journalCount, setJournalCount] = useState(0);
 
   const { data: me } = useGetMe();
+  const { data: moodData } = useGetMoodEntries({ limit: 100 });
+
+  useEffect(() => {
+    AsyncStorage.getItem(JOURNAL_STORAGE_KEY).then((raw) => {
+      if (raw) setJournalCount(JSON.parse(raw).length);
+    }).catch(() => {});
+  }, []);
+
+  const entries = moodData?.entries ?? [];
+  const streak = calcStreak(entries);
+  const moodsLogged = entries.length;
+
   const displayName = me?.name ?? localUser?.name ?? "Friend";
   const displayEmail = me?.email ?? localUser?.email ?? "";
   const memberSince = localUser?.createdAt
@@ -288,18 +318,18 @@ export default function ProfileScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <Text style={styles.statEmoji}>🔥</Text>
-            <Text style={styles.statValue}>7</Text>
+            <Text style={styles.statValue}>{streak}</Text>
             <Text style={styles.statLabel}>Day streak</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statEmoji}>📊</Text>
-            <Text style={styles.statValue}>24</Text>
+            <Text style={styles.statValue}>{moodsLogged}</Text>
             <Text style={styles.statLabel}>Moods logged</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statEmoji}>🧘</Text>
-            <Text style={styles.statValue}>12</Text>
-            <Text style={styles.statLabel}>Sessions done</Text>
+            <Text style={styles.statEmoji}>📓</Text>
+            <Text style={styles.statValue}>{journalCount}</Text>
+            <Text style={styles.statLabel}>Journal entries</Text>
           </View>
         </View>
 

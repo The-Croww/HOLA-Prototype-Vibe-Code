@@ -198,6 +198,7 @@ export default function MoodTrackerScreen() {
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
   const [note, setNote] = useState("");
   const [activeSection, setActiveSection] = useState<"log" | "progress">("log");
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : 0;
@@ -210,14 +211,14 @@ export default function MoodTrackerScreen() {
   const { mutate: createEntry, isPending } = useCreateMoodEntry({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({
-          queryKey: getGetMoodEntriesQueryKey(),
-        });
+        queryClient.invalidateQueries({ queryKey: getGetMoodEntriesQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetTodayMoodQueryKey() });
         setSelectedEmotions([]);
         setNote("");
+        setSelectedScore(5);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert("Logged!", "Your mood has been saved.");
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 2500);
       },
       onError: () => {
         Alert.alert("Error", "Could not save your mood. Please try again.");
@@ -317,6 +318,25 @@ export default function MoodTrackerScreen() {
       {/* LOG SECTION */}
       {activeSection === "log" && (
         <>
+          {showSuccess && (
+            <View
+              style={[
+                styles.successBanner,
+                { backgroundColor: colors.calm + "22", borderColor: colors.calm },
+              ]}
+            >
+              <Text style={{ fontSize: 18 }}>✅</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.successTitle, { color: colors.calm }]}>
+                  Mood logged!
+                </Text>
+                <Text style={[styles.successSub, { color: colors.calm }]}>
+                  Great job checking in with yourself today.
+                </Text>
+              </View>
+            </View>
+          )}
+
           <View
             style={[
               styles.card,
@@ -760,6 +780,24 @@ export default function MoodTrackerScreen() {
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 20, gap: 16 },
   heading: { fontSize: 26, fontFamily: "Inter_600SemiBold" },
+  successBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+  },
+  successTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  successSub: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: 2,
+    opacity: 0.8,
+  },
   tabs: {
     flexDirection: "row",
     borderRadius: 12,
