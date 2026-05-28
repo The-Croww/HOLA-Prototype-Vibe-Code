@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,85 +9,11 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
-import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useLocalSearchParams } from "expo-router";
 import { useColors } from "@/hooks/useColors";
-
-// ─── AUDIO POOLS ───
-// Each meditation draws from a pool of tracks. Add more files as needed.
-const AUDIO_POOLS = {
-  sleep: [
-    require("@/assets/audio/Sleep 2.mp3"),
-  ],
-  energy: [
-    require("@/assets/audio/Morning 1.mp3"),
-    require("@/assets/audio/Morning 2.mp3"),
-  ],
-  anxiety: [
-    require("@/assets/audio/Deep 1.mp3"),
-    require("@/assets/audio/Deep 2.mp3"),
-  ],
-  mood: [require("@/assets/audio/Love 1.mp3")],
-  focus: [require("@/assets/audio/Focus Flow 1.mp3")],
-  anger: [
-    require("@/assets/audio/Anger 1.mp3"),
-    require("@/assets/audio/Anger 2.mp3"),
-  ],
-};
-
-// ─── MEDITATIONS ───
-// No fixed audioSource — we pick randomly from the pool on each play
-const MEDITATIONS = [
-  {
-    id: "m1",
-    emoji: "🌙",
-    title: "Sleep Well",
-    duration: "10 min",
-    tag: "Sleep",
-    pool: "sleep" as const,
-  },
-  {
-    id: "m2",
-    emoji: "☀️",
-    title: "Morning Reset",
-    duration: "5 min",
-    tag: "Energy",
-    pool: "energy" as const,
-  },
-  {
-    id: "m3",
-    emoji: "🫁",
-    title: "Deep Breathwork",
-    duration: "7 min",
-    tag: "Anxiety",
-    pool: "anxiety" as const,
-  },
-  {
-    id: "m4",
-    emoji: "❤️",
-    title: "Self-Love",
-    duration: "8 min",
-    tag: "Mood",
-    pool: "mood" as const,
-  },
-  {
-    id: "m5",
-    emoji: "🎯",
-    title: "Focus Flow",
-    duration: "6 min",
-    tag: "Focus",
-    pool: "focus" as const,
-  },
-  {
-    id: "m6",
-    emoji: "😤",
-    title: "Anger Release",
-    duration: "5 min",
-    tag: "Anger",
-    pool: "anger" as const,
-  },
-];
+import { Audio } from "expo-av";
 
 const TOOLS = [
   {
@@ -134,6 +60,57 @@ const TOOLS = [
   },
 ];
 
+const MEDITATIONS = [
+  {
+    id: "m1",
+    emoji: "🌙",
+    title: "Sleep Well",
+    duration: "3:00",
+    tag: "Sleep",
+    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+  },
+  {
+    id: "m2",
+    emoji: "☀️",
+    title: "Morning Reset",
+    duration: "2:30",
+    tag: "Energy",
+    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+  },
+  {
+    id: "m3",
+    emoji: "🫁",
+    title: "Deep Breathwork",
+    duration: "2:00",
+    tag: "Anxiety",
+    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+  },
+  {
+    id: "m4",
+    emoji: "❤️",
+    title: "Self-Love",
+    duration: "2:45",
+    tag: "Mood",
+    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+  },
+  {
+    id: "m5",
+    emoji: "🎯",
+    title: "Focus Flow",
+    duration: "2:15",
+    tag: "Focus",
+    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
+  },
+  {
+    id: "m6",
+    emoji: "😤",
+    title: "Anger Release",
+    duration: "2:00",
+    tag: "Anger",
+    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
+  },
+];
+
 type BreathPhase = "ready" | "inhale" | "hold" | "exhale" | "done";
 type BreathMode = "478" | "box";
 
@@ -142,24 +119,91 @@ const BREATH_MODES = {
   box: { label: "Box Breathing", inhale: 4, hold: 4, exhale: 4, rounds: 4 },
 };
 
-// Fisher-Yates shuffle
-function shuffleArray<T>(array: T[]): T[] {
-  const arr = [...array];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
 export default function MindfulnessScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
 
   const [activeTab, setActiveTab] = useState<"breathe" | "meditate" | "tools">(
-    "breathe",
+    tabParam === "meditate" ? "meditate" : tabParam === "tools" ? "tools" : "breathe",
   );
+
+  useEffect(() => {
+    if (tabParam === "meditate" || tabParam === "breathe" || tabParam === "tools") {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  // Audio player state
+  const [currentTrack, setCurrentTrack] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const soundRef = useRef<Audio.Sound | null>(null);
+
+  const stopAudio = async () => {
+    if (soundRef.current) {
+      await soundRef.current.stopAsync();
+      await soundRef.current.unloadAsync();
+      soundRef.current = null;
+    }
+    setIsPlaying(false);
+    setCurrentTrack(null);
+  };
+
+  const playMeditation = async (med: (typeof MEDITATIONS)[0]) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      // If same track is playing, stop it
+      if (currentTrack === med.id && isPlaying) {
+        await stopAudio();
+        return;
+      }
+
+      // Stop any existing audio
+      if (soundRef.current) {
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+
+      setIsLoadingAudio(true);
+      setCurrentTrack(med.id);
+      setIsPlaying(false);
+
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+      });
+
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: med.url },
+        { shouldPlay: true, isLooping: true },
+      );
+
+      soundRef.current = sound;
+      setIsPlaying(true);
+      setIsLoadingAudio(false);
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded) {
+          setIsPlaying(false);
+        }
+      });
+    } catch (err) {
+      console.error("Audio error:", err);
+      setIsLoadingAudio(false);
+      setCurrentTrack(null);
+    }
+  };
+
+  // Cleanup audio on tab change
+  useEffect(() => {
+    if (activeTab !== "meditate") {
+      stopAudio();
+    }
+  }, [activeTab]);
 
   // Breathing state
   const [breathMode, setBreathMode] = useState<BreathMode>("478");
@@ -171,168 +215,13 @@ export default function MindfulnessScreen() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isRunning = useRef(false);
 
-  // Audio state
-  const [playingId, setPlayingId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [audioError, setAudioError] = useState<string | null>(null);
-  const [playbackPosition, setPlaybackPosition] = useState(0);
-  const [playbackDuration, setPlaybackDuration] = useState(0);
-  const [currentTrackName, setCurrentTrackName] = useState("");
-  const soundRef = useRef<Audio.Sound | null>(null);
-
-  // Track history so we don't repeat the same file immediately
-  const historyRef = useRef<Record<string, string>>({});
-
   useEffect(() => {
-    if (Platform.OS !== "web") {
-      Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-      }).catch(() => {});
-    }
-
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       isRunning.current = false;
-      unloadAudio();
     };
   }, []);
 
-  const getRandomAudio = useCallback(
-    (poolKey: keyof typeof AUDIO_POOLS): { source: any; name: string } => {
-      const pool = AUDIO_POOLS[poolKey];
-      const lastPlayed = historyRef.current[poolKey];
-
-      // Filter out the last played track to avoid immediate repeats
-      let available = pool;
-      if (lastPlayed && pool.length > 1) {
-        available = pool.filter((_, idx) => {
-          const trackName = `${poolKey}-${idx}`;
-          return trackName !== lastPlayed;
-        });
-      }
-
-      const randomIndex = Math.floor(Math.random() * available.length);
-      // Find the actual index in the original pool
-      const actualIndex = pool.findIndex(
-        (item) => item === available[randomIndex],
-      );
-      const trackName = `${poolKey}-${actualIndex}`;
-
-      historyRef.current[poolKey] = trackName;
-
-      return { source: available[randomIndex], name: trackName };
-    },
-    [],
-  );
-
-  const unloadAudio = async () => {
-    if (soundRef.current) {
-      await soundRef.current.unloadAsync();
-      soundRef.current = null;
-    }
-    setPlayingId(null);
-    setIsPlaying(false);
-    setPlaybackPosition(0);
-    setPlaybackDuration(0);
-    setCurrentTrackName("");
-  };
-
-  const playMeditation = async (meditation: (typeof MEDITATIONS)[number]) => {
-    // If tapping the same one that's playing, pause it
-    if (playingId === meditation.id && isPlaying) {
-      await pauseAudio();
-      return;
-    }
-
-    // If tapping the same one that's paused, resume it (same track)
-    if (playingId === meditation.id && !isPlaying) {
-      await resumeAudio();
-      return;
-    }
-
-    // Otherwise, load and play NEW random audio
-    try {
-      setIsLoading(true);
-      Haptics.selectionAsync();
-
-      // Unload previous
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-      }
-
-      // 🎲 PICK RANDOM AUDIO FROM POOL
-      const { source, name } = getRandomAudio(meditation.pool);
-      setCurrentTrackName(name);
-
-      const { sound } = await Audio.Sound.createAsync(
-        source,
-        { shouldPlay: true },
-        onPlaybackStatusUpdate,
-      );
-
-      soundRef.current = sound;
-      setPlayingId(meditation.id);
-      setIsPlaying(true);
-      setIsLoading(false);
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error) {
-      setIsLoading(false);
-      setAudioError("Couldn't play audio on this device. Try another track.");
-      setTimeout(() => setAudioError(null), 3000);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    }
-  };
-
-  const pauseAudio = async () => {
-    if (soundRef.current) {
-      await soundRef.current.pauseAsync();
-      setIsPlaying(false);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-  };
-
-  const resumeAudio = async () => {
-    if (soundRef.current) {
-      await soundRef.current.playAsync();
-      setIsPlaying(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-  };
-
-  const stopAudio = async () => {
-    await unloadAudio();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  };
-
-  const onPlaybackStatusUpdate = (status: any) => {
-    if (status.isLoaded) {
-      setPlaybackPosition(status.positionMillis || 0);
-      setPlaybackDuration(status.durationMillis || 0);
-
-      if (status.didJustFinish) {
-        unloadAudio();
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-    }
-  };
-
-  const formatTime = (millis: number) => {
-    const totalSeconds = Math.floor(millis / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-  };
-
-  const getProgressPercent = () => {
-    if (playbackDuration === 0) return 0;
-    return (playbackPosition / playbackDuration) * 100;
-  };
-
-  // ─── BREATHING FUNCTIONS (unchanged) ───
   const animateCircle = (toScale: number, duration: number) => {
     Animated.timing(scaleAnim, {
       toValue: toScale,
@@ -556,10 +445,6 @@ export default function MindfulnessScreen() {
       borderColor: colors.border,
       backgroundColor: colors.card,
     },
-    meditationRowActive: {
-      borderColor: colors.primary,
-      backgroundColor: colors.primary + "08",
-    },
     meditationEmoji: { fontSize: 28 },
     meditationInfo: { flex: 1 },
     meditationTitle: {
@@ -628,69 +513,7 @@ export default function MindfulnessScreen() {
       fontFamily: "Inter_600SemiBold",
       color: colors.foreground,
     },
-    // Audio player styles
-    audioPlayer: {
-      marginTop: 16,
-      padding: 16,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
-      gap: 12,
-    },
-    audioPlayerHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-    },
-    audioPlayerTitle: {
-      fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
-      color: colors.foreground,
-    },
-    audioTrackName: {
-      fontSize: 11,
-      fontFamily: "Inter_400Regular",
-      color: colors.mutedForeground,
-      marginTop: 2,
-    },
-    audioControls: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 20,
-    },
-    playButton: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: colors.primary,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    playButtonText: {
-      fontSize: 24,
-      color: colors.primaryForeground,
-    },
-    progressBar: {
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: colors.secondary,
-      overflow: "hidden",
-    },
-    progressFill: {
-      height: "100%",
-      borderRadius: 2,
-      backgroundColor: colors.primary,
-    },
-    timeText: {
-      fontSize: 11,
-      fontFamily: "Inter_400Regular",
-      color: colors.mutedForeground,
-    },
   });
-
-  const activeMeditation = MEDITATIONS.find((m) => m.id === playingId);
 
   return (
     <View style={styles.container}>
@@ -837,113 +660,82 @@ export default function MindfulnessScreen() {
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Guided meditations</Text>
             <Text style={styles.cardDesc}>
-              Tap any session to play a random track. Each time you tap, a
-              different song plays.
+              Tap any session to play calming audio. Use headphones for the best
+              experience.
             </Text>
-            {audioError && (
-              <View style={{ backgroundColor: "#FF6B6B22", borderRadius: 8, padding: 10 }}>
-                <Text style={{ color: "#FF6B6B", fontSize: 13, fontFamily: "Inter_500Medium" }}>
-                  {audioError}
-                </Text>
-              </View>
-            )}
             <View style={styles.meditationGrid}>
-              {MEDITATIONS.map((med) => (
-                <TouchableOpacity
-                  key={med.id}
-                  style={[
-                    styles.meditationRow,
-                    playingId === med.id && styles.meditationRowActive,
-                  ]}
-                  activeOpacity={0.7}
-                  onPress={() => playMeditation(med)}
-                  disabled={isLoading && playingId !== med.id}
-                >
-                  <Text style={styles.meditationEmoji}>
-                    {isLoading && playingId === med.id ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      med.emoji
-                    )}
-                  </Text>
-                  <View style={styles.meditationInfo}>
-                    <Text style={styles.meditationTitle}>{med.title}</Text>
-                    <Text style={styles.meditationDuration}>
-                      {playingId === med.id && isPlaying
-                        ? `▶ ${formatTime(playbackPosition)} / ${formatTime(playbackDuration)}`
-                        : playingId === med.id && !isPlaying
-                          ? `⏸ Paused`
-                          : med.duration}
-                    </Text>
-                  </View>
-                  <View style={styles.meditationTag}>
-                    <Text style={styles.meditationTagText}>{med.tag}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+              {MEDITATIONS.map((med) => {
+                const isActive = currentTrack === med.id;
+                return (
+                  <TouchableOpacity
+                    key={med.id}
+                    style={[
+                      styles.meditationRow,
+                      isActive && {
+                        borderColor: colors.calm,
+                        backgroundColor: colors.calm + "11",
+                      },
+                    ]}
+                    activeOpacity={0.7}
+                    onPress={() => playMeditation(med)}
+                  >
+                    <Text style={styles.meditationEmoji}>{med.emoji}</Text>
+                    <View style={styles.meditationInfo}>
+                      <Text
+                        style={[
+                          styles.meditationTitle,
+                          isActive && { color: colors.calm },
+                        ]}
+                      >
+                        {med.title}
+                      </Text>
+                      <Text style={styles.meditationDuration}>
+                        {med.duration}
+                      </Text>
+                    </View>
+                    <View style={styles.meditationTag}>
+                      <Text style={styles.meditationTagText}>{med.tag}</Text>
+                    </View>
+                    <View
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 16,
+                        backgroundColor: isActive
+                          ? colors.calm
+                          : colors.secondary,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderWidth: 1,
+                        borderColor: isActive ? colors.calm : colors.border,
+                      }}
+                    >
+                      {isLoadingAudio && isActive ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={{ fontSize: 12 }}>
+                          {isActive && isPlaying ? "⏸" : "▶︎"}
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
-            {/* Audio Player Controls */}
-            {activeMeditation && (
-              <View style={styles.audioPlayer}>
-                <View style={styles.audioPlayerHeader}>
-                  <View>
-                    <Text style={styles.audioPlayerTitle}>
-                      {activeMeditation.emoji} {activeMeditation.title}
-                    </Text>
-                    <Text style={styles.audioTrackName}>
-                      Track: {currentTrackName}
-                    </Text>
-                  </View>
-                  <TouchableOpacity onPress={stopAudio}>
-                    <Text
-                      style={{ fontSize: 18, color: colors.mutedForeground }}
-                    >
-                      ✕
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.progressBar}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { width: `${getProgressPercent()}%` },
-                    ]}
-                  />
-                </View>
-
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Text style={styles.timeText}>
-                    {formatTime(playbackPosition)}
-                  </Text>
-                  <Text style={styles.timeText}>
-                    {formatTime(playbackDuration)}
-                  </Text>
-                </View>
-
-                <View style={styles.audioControls}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      if (isPlaying) {
-                        pauseAudio();
-                      } else {
-                        resumeAudio();
-                      }
-                    }}
-                    style={styles.playButton}
-                  >
-                    <Text style={styles.playButtonText}>
-                      {isPlaying ? "⏸" : "▶"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+            {currentTrack && (
+              <TouchableOpacity
+                style={[
+                  styles.stopBtn,
+                  { borderColor: colors.alert + "44", marginTop: 4 },
+                ]}
+                onPress={stopAudio}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.stopBtnText, { color: colors.alert }]}>
+                  Stop audio
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
         )}

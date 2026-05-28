@@ -28,10 +28,10 @@ const QUICK_MOOD = [
 ];
 
 const QUICK_ACTIONS = [
-  { label: "Journal", icon: "book-open" as const, color: "#5B9CF6" },
-  { label: "Breathe", icon: "wind" as const, color: "#3DD68C" },
-  { label: "Chat", icon: "message-circle" as const, color: "#FFB547" },
-  { label: "Meditate", icon: "headphones" as const, color: "#C084FC" },
+  { label: "Journal", icon: "book-open" as const, color: "#5B9CF6", route: "/journal" as const },
+  { label: "Breathe", icon: "wind" as const, color: "#3DD68C", route: "/(tabs)/mindfulness" as const, tab: "breathe" },
+  { label: "Chat", icon: "message-circle" as const, color: "#FFB547", route: "/(tabs)/chat" as const },
+  { label: "Meditate", icon: "headphones" as const, color: "#C084FC", route: "/(tabs)/mindfulness" as const, tab: "meditate" },
 ];
 
 export default function HomeScreen() {
@@ -155,6 +155,13 @@ export default function HomeScreen() {
                 { backgroundColor: colors.card, borderColor: colors.border },
               ]}
               activeOpacity={0.7}
+              onPress={() => {
+                if ("tab" in action && action.tab) {
+                  router.push({ pathname: action.route, params: { tab: action.tab } } as never);
+                } else {
+                  router.push(action.route as never);
+                }
+              }}
             >
               <View style={[styles.gridIcon, { backgroundColor: action.color + "22" }]}>
                 <Feather name={action.icon} size={22} color={action.color} />
