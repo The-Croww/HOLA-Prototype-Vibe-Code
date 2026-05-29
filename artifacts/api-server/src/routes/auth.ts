@@ -5,10 +5,11 @@ import { signToken } from "../middleware/auth";
 const router = Router();
 
 router.post("/v1/auth/register", (req, res) => {
-  const { name, email, password } = req.body as {
+  const { name, email, password, role } = req.body as {
     name?: string;
     email?: string;
     password?: string;
+    role?: string;
   };
   if (!name || !email || !password) {
     res.status(400).json({ error: "Name, email, and password are required" });
@@ -18,27 +19,29 @@ router.post("/v1/auth/register", (req, res) => {
     res.status(400).json({ error: "Email already registered" });
     return;
   }
-  const id =
-    Date.now().toString() + Math.random().toString(36).substring(2, 9);
+  const id = Date.now().toString() + Math.random().toString(36).substring(2, 9);
   const user: UserRecord = {
     id,
     name,
     email,
     password,
-    role: "user",
+    role: role === "psychologist" || role === "admin" ? role : "user",
     avatar: null,
     createdAt: new Date().toISOString(),
   };
   usersByEmail.set(email, user);
   usersById.set(id, user);
-  const token = signToken(id, "user");
+  const token = signToken(
+    id,
+    role === "psychologist" || role === "admin" ? role : "user",
+  );
   res.status(201).json({
     token,
     user: {
       id,
       name,
       email,
-      role: "user",
+      role: role === "psychologist" || role === "admin" ? role : "user",
       avatar: null,
       createdAt: user.createdAt,
     },
